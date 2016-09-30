@@ -1,0 +1,59 @@
+version: "2"
+
+services:
+  consul:
+    container_name: consul
+    image: consul
+    expose:
+      - "8300"
+      - "8400"
+      - "8500"
+    restart: always
+  registrator:
+    container_name: registrator
+    image: gliderlabs/registrator:master
+    volumes:
+      - "/var/run/docker.sock:/tmp/docker.sock"
+    command: -internal consul://consul:8500
+    restart: always
+    depends_on:
+      - consul
+  web1:
+    image: deis/mock-http-server
+    container_name: web1
+    expose:
+      - "8080"
+    environment:
+      SERVICE_NAME: "web"
+      SERVICE_TAGS: "web"
+    restart: always
+    depends_on:
+      - registrator
+  web2:
+    image: deis/mock-http-server
+    container_name: web2
+    expose:
+      - "8080"
+    environment:
+      SERVICE_8080_NAME: "web"
+      SERVICE_8080_TAGS: "web"
+    restart: always
+    depends_on:
+      - registrator
+  haproxy:
+    build: ./haproxy
+    container_name: haproxy
+    image: anthcourtney/haproxy-consul
+    ports:
+      - 80
+    depends_on:
+      - web1
+      - web2
+  test:
+    container_name: test-client
+    build: ./test
+    depends_on:
+      - haproxy
+
+networks:
+  default:
